@@ -131,7 +131,7 @@ if isinstance(date_range, (list, tuple)) and len(date_range) == 2:
 
     st.subheader("Top Products by Revenue")
     df_products = get_top_products(date_range[0], date_range[1])
-    st.bar_chart(df_products.set_index("Product"), y="Revenue")
+    st.bar_chart(df_products, x="Product", y="Revenue")
 
 # --- Smoke test ---
 st.divider()
