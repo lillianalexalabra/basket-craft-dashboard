@@ -158,6 +158,11 @@ if isinstance(date_range, (list, tuple)) and len(date_range) == 2:
 
     st.subheader("Top Products by Revenue")
     df_products = get_top_products(date_range[0], date_range[1])
+    df_products["Product"] = pd.Categorical(
+        df_products["Product"],
+        categories=df_products["Product"].tolist(),
+        ordered=True,
+    )
     st.bar_chart(df_products, x="Product", y="Revenue")
 
     st.subheader("Bundle Finder")
