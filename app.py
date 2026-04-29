@@ -80,6 +80,22 @@ elif len(rows) == 1:
     col4.metric("Items Sold",      f"{curr[4]:,}")
 
 @st.cache_data(ttl=600)
+def get_top_products(start_date: datetime.date, end_date: datetime.date):
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT p.PRODUCT_NAME, SUM(oi.PRICE_USD) AS revenue
+        FROM ORDER_ITEMS oi
+        JOIN PRODUCTS p ON oi.PRODUCT_ID = p.PRODUCT_ID
+        WHERE TO_TIMESTAMP_NTZ(oi.CREATED_AT, 9)::DATE BETWEEN %s AND %s
+        GROUP BY 1
+        ORDER BY 2 DESC
+    """, (start_date, end_date))
+    rows = cur.fetchall()
+    return pd.DataFrame(rows, columns=["Product", "Revenue"])
+
+
+@st.cache_data(ttl=600)
 def get_revenue_trend(start_date: datetime.date, end_date: datetime.date):
     conn = get_connection()
     cur = conn.cursor()
@@ -112,6 +128,10 @@ date_range = st.date_input(
 if isinstance(date_range, (list, tuple)) and len(date_range) == 2:
     df = get_revenue_trend(date_range[0], date_range[1])
     st.area_chart(df.set_index("Month"), y="Revenue")
+
+    st.subheader("Top Products by Revenue")
+    df_products = get_top_products(date_range[0], date_range[1])
+    st.bar_chart(df_products.set_index("Product"), y="Revenue")
 
 # --- Smoke test ---
 st.divider()
