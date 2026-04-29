@@ -168,6 +168,11 @@ if isinstance(date_range, (list, tuple)) and len(date_range) == 2:
     if df_bundles.empty:
         st.info("No co-purchases found for this product in the selected date range.")
     else:
+        df_bundles["Bought Together With"] = pd.Categorical(
+            df_bundles["Bought Together With"],
+            categories=df_bundles["Bought Together With"].tolist(),
+            ordered=True,
+        )
         st.bar_chart(df_bundles, x="Bought Together With", y="Orders")
 
 # --- Smoke test ---
