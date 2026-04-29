@@ -1,5 +1,7 @@
+import datetime
 import os
 
+import pandas as pd
 import snowflake.connector
 import streamlit as st
 from dotenv import load_dotenv
@@ -76,6 +78,40 @@ elif len(rows) == 1:
     col2.metric("Total Orders",    f"{curr[2]:,}")
     col3.metric("Avg Order Value", f"${curr[3]:.2f}")
     col4.metric("Items Sold",      f"{curr[4]:,}")
+
+@st.cache_data(ttl=600)
+def get_revenue_trend(start_date: datetime.date, end_date: datetime.date):
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT
+            DATE_TRUNC('month', TO_TIMESTAMP_NTZ(CREATED_AT, 9))::DATE AS month,
+            SUM(PRICE_USD) AS revenue
+        FROM ORDERS
+        WHERE TO_TIMESTAMP_NTZ(CREATED_AT, 9)::DATE BETWEEN %s AND %s
+        GROUP BY 1
+        ORDER BY 1
+    """, (start_date, end_date))
+    rows = cur.fetchall()
+    return pd.DataFrame(rows, columns=["Month", "Revenue"])
+
+
+# --- Revenue trend ---
+st.subheader("Revenue Trend")
+
+DATA_START = datetime.date(2023, 3, 19)
+DATA_END   = datetime.date(2026, 3, 19)
+
+date_range = st.date_input(
+    "Date range",
+    value=(DATA_START, DATA_END),
+    min_value=DATA_START,
+    max_value=DATA_END,
+)
+
+if isinstance(date_range, (list, tuple)) and len(date_range) == 2:
+    df = get_revenue_trend(date_range[0], date_range[1])
+    st.area_chart(df.set_index("Month"), y="Revenue")
 
 # --- Smoke test ---
 st.divider()
