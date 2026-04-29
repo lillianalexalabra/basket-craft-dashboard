@@ -80,6 +80,33 @@ elif len(rows) == 1:
     col4.metric("Items Sold",      f"{curr[4]:,}")
 
 @st.cache_data(ttl=600)
+def get_products():
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT DISTINCT PRODUCT_ID, PRODUCT_NAME FROM PRODUCTS ORDER BY PRODUCT_ID")
+    return cur.fetchall()
+
+
+@st.cache_data(ttl=600)
+def get_bundles(product_id: int, start_date: datetime.date, end_date: datetime.date):
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT p.PRODUCT_NAME, COUNT(DISTINCT oi2.ORDER_ID) AS orders_together
+        FROM ORDER_ITEMS oi1
+        JOIN ORDER_ITEMS oi2 ON oi1.ORDER_ID = oi2.ORDER_ID
+            AND oi1.PRODUCT_ID != oi2.PRODUCT_ID
+        JOIN PRODUCTS p ON oi2.PRODUCT_ID = p.PRODUCT_ID
+        WHERE oi1.PRODUCT_ID = %s
+          AND TO_TIMESTAMP_NTZ(oi1.CREATED_AT, 9)::DATE BETWEEN %s AND %s
+        GROUP BY 1
+        ORDER BY 2 DESC
+    """, (product_id, start_date, end_date))
+    rows = cur.fetchall()
+    return pd.DataFrame(rows, columns=["Bought Together With", "Orders"])
+
+
+@st.cache_data(ttl=600)
 def get_top_products(start_date: datetime.date, end_date: datetime.date):
     conn = get_connection()
     cur = conn.cursor()
@@ -132,6 +159,16 @@ if isinstance(date_range, (list, tuple)) and len(date_range) == 2:
     st.subheader("Top Products by Revenue")
     df_products = get_top_products(date_range[0], date_range[1])
     st.bar_chart(df_products, x="Product", y="Revenue")
+
+    st.subheader("Bundle Finder")
+    products = get_products()
+    name_to_id = {name: pid for pid, name in products}
+    selected = st.selectbox("Pick a product", list(name_to_id.keys()))
+    df_bundles = get_bundles(name_to_id[selected], date_range[0], date_range[1])
+    if df_bundles.empty:
+        st.info("No co-purchases found for this product in the selected date range.")
+    else:
+        st.bar_chart(df_bundles, x="Bought Together With", y="Orders")
 
 # --- Smoke test ---
 st.divider()
